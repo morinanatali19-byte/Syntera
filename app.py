@@ -416,7 +416,7 @@ elif page == "Evening Closure":
 
         if prev_date_row:
             prev_date = prev_date_row[0]
-            cursor.execute("SELECT direction_name, status FROM daily_snapshots WHERE snapshot_date = %s", (prev_date,))
+            cursor.execute("SELECT snapshot_date FROM daily_snapshots WHERE snapshot_date != %s ORDER BY id DESC LIMIT 1", (today,))
             prev_statuses = {row[0]: row[1] for row in cursor.fetchall()}
 
             st.write(f"**Изменения с {prev_date}:**")
