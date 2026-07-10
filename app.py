@@ -236,7 +236,17 @@ elif page == "Executive Briefing":
                                 st.write(f"**Решение:** {decision_text}")
                                 st.write(f"**Владелец:** {owner}")
                                 st.write(f"**Срок:** {deadline}")
-
+                                cursor.execute(
+                                "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC",
+                                (name,))
+                            all_versions = cursor.fetchall()                       
+                            if len(all_versions) > 1:
+                                with st.expander(f"История решений по направлению ({len(all_versions)} версий)"):
+                                    for i, (v_text, v_owner, v_deadline) in enumerate(all_versions):
+                                        label = "Текущее" if i == 0 else f"Версия {len(all_versions) - i}"
+                                        st.write(f"**{label}:** {v_text}")
+                                        st.caption(f"Владелец: {v_owner} · Срок: {v_deadline}")
+                        
                             cursor.execute(
                                 "SELECT reasoning, challenge_date FROM ceo_challenges WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
                                 (name,))
