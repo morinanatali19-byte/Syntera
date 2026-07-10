@@ -221,17 +221,25 @@ elif page == "Executive Briefing":
                             (name,))
                         d = cursor.fetchone()
                         status = "🟢 Нет выявленных отклонений"
+                        status_type = "success"
                         if d:
                             decision_text, owner, deadline = d
                             try:
-                                from datetime import datetime
                                 deadline_date = datetime.strptime(deadline, "%d.%m.%Y")
                                 if deadline_date < datetime.now():
                                     status = "🟠 Срок истёк"
+                                    status_type = "warning"
                             except ValueError:
                                 status = "🟡 Не удалось распознать срок"
+                                status_type = "info"
 
                         with st.expander(f"{name} (вес: {weight}) — {status}"):
+                            if status_type == "warning":
+                                st.warning(f"Требует внимания: {status}")
+                            elif status_type == "info":
+                                st.info(status)
+                            else:
+                                st.success(status)
                             if d:
                                 st.write(f"**Решение:** {decision_text}")
                                 st.write(f"**Владелец:** {owner}")
