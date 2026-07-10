@@ -402,8 +402,27 @@ elif page == "Evening Closure":
         cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
         today_signals = cursor.fetchall()
         if today_signals:
+            st.write("**Сегодня:**")
             for m_name, m_value in today_signals:
                 st.write(f"- {m_name}: **{m_value}**")
+
+        cursor.execute(
+            "SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
+        all_metric_names = [row[0] for row in cursor.fetchall()]
+
+        if all_metric_names:
+            st.write("**История по показателям:**")
+            selected_metric = st.selectbox("Выберите показатель для просмотра истории",
+                                             all_metric_names, key="metric_history_select")
+
+            cursor.execute(
+                "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id DESC LIMIT 30",
+                (selected_metric,))
+            history = cursor.fetchall()
+
+            if history:
+                for h_date, h_value in history:
+                    st.write(f"- {h_date}: **{h_value}**")
 
         st.divider()
 
