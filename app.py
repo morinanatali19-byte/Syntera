@@ -443,9 +443,10 @@ elif page == "Evening Closure":
                 valid_dates = []
                 has_non_numeric = False
 
+                import re
                 for h_date, h_value in history:
                     try:
-                        cleaned = h_value.replace(" ", "").replace(",", ".")
+                        cleaned = re.sub(r"[^\d.,\-]", "", h_value).replace(",", ".")
                         numeric_values.append(float(cleaned))
                         valid_dates.append(h_date)
                     except ValueError:
