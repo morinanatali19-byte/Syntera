@@ -416,13 +416,54 @@ elif page == "Evening Closure":
                     "INSERT INTO business_signals (signal_date, metric_name, value) VALUES (%s, %s, %s)",
                     (today, metric_name.strip(), metric_value.strip()))
                 st.rerun()
-
-        cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
+                cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
         today_signals = cursor.fetchall()
         if today_signals:
             st.write("**Сегодня:**")
             for m_name, m_value in today_signals:
                 st.write(f"- {m_name}: **{m_value}**")
+
+        cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
+        all_metric_names = [row[0] for row in cursor.fetchall()]
+
+        if all_metric_names:
+            st.write("**История по показателям:**")
+            selected_metric = st.selectbox("Выберите показатель для просмотра истории",
+                                             all_metric_names, key="metric_history_select")
+
+        cursor.execute(
+                "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id ASC LIMIT 30",
+                (selected_metric,))
+        history = cursor.fetchall()
+
+        if history:
+                import pandas as pd
+
+                numeric_values = []
+                valid_dates = []
+                has_non_numeric = False
+
+                for h_date, h_value in history:
+                    try:
+                        cleaned = h_value.replace(" ", "").replace(",", ".")
+                        numeric_values.append(float(cleaned))
+                        valid_dates.append(h_date)
+                    except ValueError:
+                        has_non_numeric = True
+
+                if numeric_values:
+                    chart_data = pd.DataFrame({
+                        "Дата": valid_dates,
+                        selected_metric: numeric_values
+                    }).set_index("Дата")
+                    st.line_chart(chart_data)
+
+                if has_non_numeric:
+                    st.caption("Некоторые значения не являются числами и не показаны на графике.")
+
+                st.write("**Подробно:**")
+                for h_date, h_value in reversed(history):
+                    st.write(f"- {h_date}: **{h_value}**")
 
         cursor.execute(
             "SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
