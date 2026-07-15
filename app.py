@@ -420,8 +420,10 @@ elif page == "Decision Board":
         weight_row = cursor.fetchone()
         weight = weight_row[0] if weight_row else "?"
 
-        st.write(f"**Направление:** {direction}")
-        st.write(f"**Strategic Weight:** {weight}")
+        st.markdown(
+            f'<div class="info-card"><b>Направление:</b> {direction} &nbsp; '
+            f'<span class="status-badge badge-white">Strategic Weight: {weight}</span></div>',
+            unsafe_allow_html=True)
         st.caption("Высокий стратегический вес + отсутствие решения")
         st.divider()
 
@@ -434,9 +436,11 @@ elif page == "Decision Board":
         st.write("### 3. Риски")
         risks = st.text_area("Что может помешать достижению результата?", key="db_risks")
 
+        st.divider()
         st.write("### 4. Рекомендация Syntera")
         st.info("Для контроля этого решения зафиксируйте: ожидаемый результат, срок и владельца.")
 
+        st.divider()
         st.write("### 5. Решение")
         decision_text = st.text_area("Формулировка решения", key="db_decision")
         owner = st.text_input("Владелец", key="db_owner")
