@@ -24,6 +24,14 @@ div[data-testid="stExpander"] {
     border: 1px solid #2A2D34;
     border-radius: 10px;
 }
+.info-card {
+    background-color: #1A1D24;
+    border: 1px solid #2A2D34;
+    border-left: 3px solid #C9A227;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -326,13 +334,15 @@ elif page == "Executive Briefing":
             if white_spots:
                 st.write("**Требуют внимания (нет решения):**")
                 for name, weight in sorted(white_spots, key=lambda d: -d[1]):
+                    st.markdown(f'<div class="info-card">', unsafe_allow_html=True)
                     col1, col2 = st.columns([4, 1])
                     with col1:
-                        st.write(f"- {name} (вес: {weight})")
+                        st.write(f"**{name}** &nbsp; <span class='status-badge badge-white'>вес {weight}</span>", unsafe_allow_html=True)
                     with col2:
                         if st.button("Решить", key=f"decide_{name}"):
                             st.session_state.selected_direction = name
                             st.info("Направление выбрано. Перейдите во вкладку 'Decision Board' слева.")
+                    st.markdown('</div>', unsafe_allow_html=True)
 
         current_direction_names = [name for name, weight in directions]
         cursor.execute("SELECT DISTINCT direction_name FROM decisions")
