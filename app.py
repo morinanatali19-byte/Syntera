@@ -108,6 +108,24 @@ CREATE TABLE IF NOT EXISTS decision_attributions (
     assessed_date TEXT
 )
 """)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS decision_attributions (
+    id SERIAL PRIMARY KEY,
+    decision_id INTEGER,
+    confidence TEXT,
+    note TEXT,
+    assessed_date TEXT
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
+    event_date TEXT,
+    event_type TEXT,
+    direction_name TEXT,
+    description TEXT
+)
+""")
 
 if "selected_direction" not in st.session_state:
     st.session_state.selected_direction = None
@@ -120,7 +138,8 @@ page = st.sidebar.radio("Раздел", [
     "📋 Онбординг",
     "🌅 Executive Briefing",
     "🎯 Decision Board",
-    "🌙 Evening Closure"
+    "🌙 Evening Closure",
+    "📜 Журнал событий"
 ])
 
 page = page.split(" ", 1)[1]
@@ -378,6 +397,12 @@ elif page == "Executive Briefing":
                                                 INSERT INTO decision_attributions (decision_id, confidence, note, assessed_date)
                                                 VALUES (%s, %s, %s, %s)
                                             """, (decision_id, attribution_confidence, attribution_note.strip(), attr_today))
+
+                                            cursor.execute("""
+                                                INSERT INTO events (event_date, event_type, direction_name, description)
+                                                VALUES (%s, %s, %s, %s)
+                                            """, (attr_today, "Impact Assessment", name, f"{target_metric}: {attribution_confidence}"))
+
                                             st.success("Оценка сохранена")
                                             st.rerun()
                                         else:
@@ -411,6 +436,12 @@ elif page == "Executive Briefing":
                                     cursor.execute(
                                         "INSERT INTO ceo_challenges (direction_name, reasoning, challenge_date) VALUES (%s, %s, %s)",
                                         (name, reasoning.strip(), today))
+
+                                    cursor.execute("""
+                                        INSERT INTO events (event_date, event_type, direction_name, description)
+                                        VALUES (%s, %s, %s, %s)
+                                    """, (today, "Возражение CEO", name, reasoning.strip()))
+
                                     st.success("Возражение зафиксировано. Статус останется прежним до пересмотра решения.")
                                     st.rerun()
                                 else:
@@ -434,6 +465,13 @@ elif page == "Executive Briefing":
                                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                                     """, (name, "Пересмотр решения", "", "", new_decision_text.strip(),
                                           new_owner.strip(), new_deadline_str))
+
+                                    event_today = datetime.now().strftime("%d.%m.%Y")
+                                    cursor.execute("""
+                                        INSERT INTO events (event_date, event_type, direction_name, description)
+                                        VALUES (%s, %s, %s, %s)
+                                    """, (event_today, "Решение пересмотрено", name, new_decision_text.strip()))
+
                                     st.success("Решение пересмотрено и обновлено.")
                                     st.rerun()
                                 else:
@@ -533,6 +571,14 @@ elif page == "Decision Board":
                     INSERT INTO decisions (direction_name, conclusion, arguments, risks, decision_text, owner, deadline, target_metric)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (direction, conclusion, arguments, risks, decision_text, owner, deadline, metric_to_save))
+
+                from datetime import datetime
+                event_today = datetime.now().strftime("%d.%m.%Y")
+                cursor.execute("""
+                    INSERT INTO events (event_date, event_type, direction_name, description)
+                    VALUES (%s, %s, %s, %s)
+                """, (event_today, "Решение зафиксировано", direction, decision_text.strip()))
+
                 st.success(f"Решение по направлению '{direction}' зафиксировано.")
                 st.session_state.selected_direction = None
 
@@ -697,4 +743,39 @@ elif page == "Evening Closure":
                     cursor.execute(
                         "INSERT INTO daily_snapshots (snapshot_date, direction_name, status) VALUES (%s, %s, %s)",
                         (today, name, status))
+
+            cursor.execute("""
+                INSERT INTO events (event_date, event_type, direction_name, description)
+                VALUES (%s, %s, %s, %s)
+            """, (today, "Снимок дня сохранён", None, f"Направлений в снимке: {len(today_statuses)}"))
+
             st.success(f"Снимок за {today} сохранён")
+            # ==================== ЖУРНАЛ СОБЫТИЙ ====================
+elif page == "Журнал событий":
+    st.subheader("Журнал событий")
+
+    cursor.execute("SELECT event_date, event_type, direction_name, description FROM events ORDER BY id DESC LIMIT 100")
+    all_events = cursor.fetchall()
+
+    if not all_events:
+        st.info("Событий пока нет. Они будут появляться здесь по мере работы с приложением — "
+                 "при фиксации решений, возражениях CEO, сохранении снимков дня и оценках Impact Assessment.")
+    else:
+        type_badge_map = {
+            "Решение зафиксировано": "badge-ok",
+            "Решение пересмотрено": "badge-white",
+            "Возражение CEO": "badge-overdue",
+            "Снимок дня сохранён": "badge-white",
+            "Impact Assessment": "badge-ok",
+        }
+
+        for e_date, e_type, e_direction, e_description in all_events:
+            badge_class = type_badge_map.get(e_type, "badge-white")
+            direction_text = f" &middot; {e_direction}" if e_direction else ""
+            st.markdown(
+                f'<div class="info-card">'
+                f'<span class="status-badge {badge_class}">{e_type}</span> &nbsp; '
+                f'<b>{e_date}</b>{direction_text}<br>'
+                f'<span style="color:#9AA0A6;">{e_description}</span>'
+                f'</div>',
+                unsafe_allow_html=True)
