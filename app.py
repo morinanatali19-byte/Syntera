@@ -373,7 +373,6 @@ elif page == "Executive Briefing":
             if white_spots:
                 st.write("**Требуют внимания (нет решения):**")
                 for name, weight in sorted(white_spots, key=lambda d: -d[1]):
-                    st.markdown(f'<div class="info-card">', unsafe_allow_html=True)
                     col1, col2 = st.columns([4, 1])
                     with col1:
                         priority_label = "Высокий приоритет" if weight >= 4 else ("Средний приоритет" if weight >= 2 else "Низкий приоритет")
@@ -386,7 +385,6 @@ elif page == "Executive Briefing":
                         if st.button("Решить", key=f"decide_{name}"):
                             st.session_state.selected_direction = name
                             st.info("Направление выбрано. Перейдите во вкладку 'Decision Board' слева.")
-                    st.markdown('</div>', unsafe_allow_html=True)
 
         current_direction_names = [name for name, weight in directions]
         cursor.execute("SELECT DISTINCT direction_name FROM decisions")
