@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     deadline TEXT
 )
 """)
+cursor.execute("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS target_metric TEXT")
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS ceo_challenges (
     id SERIAL PRIMARY KEY,
@@ -88,6 +89,23 @@ CREATE TABLE IF NOT EXISTS business_signals (
     signal_date TEXT,
     metric_name TEXT,
     value TEXT
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS business_signals (
+    id SERIAL PRIMARY KEY,
+    signal_date TEXT,
+    metric_name TEXT,
+    value TEXT
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS decision_attributions (
+    id SERIAL PRIMARY KEY,
+    decision_id INTEGER,
+    confidence TEXT,
+    note TEXT,
+    assessed_date TEXT
 )
 """)
 
