@@ -373,11 +373,15 @@ elif page == "Executive Briefing":
             if white_spots:
                 st.write("**Требуют внимания (нет решения):**")
                 for name, weight in sorted(white_spots, key=lambda d: -d[1]):
-                    st.markdown(f'<div class="info-card">', 
-                    unsafe_allow_html=True)
+                    st.markdown(f'<div class="info-card">', unsafe_allow_html=True)
                     col1, col2 = st.columns([4, 1])
                     with col1:
-                        st.write(f"**{name}** &nbsp; <span class='status-badge badge-white'>вес {weight}</span>", unsafe_allow_html=True)
+                        priority_label = "Высокий приоритет" if weight >= 4 else ("Средний приоритет" if weight >= 2 else "Низкий приоритет")
+                        priority_class = "badge-overdue" if weight >= 4 else ("badge-white" if weight >= 2 else "badge-ok")
+                        st.write(
+                            f"**{name}** &nbsp; <span class='status-badge badge-white'>вес {weight}</span> &nbsp; "
+                            f"<span class='status-badge {priority_class}'>{priority_label}</span>",
+                            unsafe_allow_html=True)
                     with col2:
                         if st.button("Решить", key=f"decide_{name}"):
                             st.session_state.selected_direction = name
