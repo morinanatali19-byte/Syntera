@@ -356,6 +356,21 @@ elif page == "Executive Briefing":
                                 st.write(f"**Владелец:** {owner}")
                                 st.write(f"**Срок:** {deadline}")
 
+                                st.divider()
+                                cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
+                                available_metrics = [row[0] for row in cursor.fetchall()]
+                                metric_options = ["Не выбрано"] + available_metrics
+                                current_index = metric_options.index(target_metric) if target_metric in metric_options else 0
+                                new_target_metric = st.selectbox(
+                                    "Целевой показатель для Impact Assessment",
+                                    metric_options, index=current_index, key=f"target_metric_edit_{decision_id}")
+                                if st.button("Обновить целевой показатель", key=f"update_metric_btn_{decision_id}"):
+                                    metric_to_save = None if new_target_metric == "Не выбрано" else new_target_metric
+                                    cursor.execute("UPDATE decisions SET target_metric = %s WHERE id = %s",
+                                                   (metric_to_save, decision_id))
+                                    st.success("Целевой показатель обновлён")
+                                    st.rerun()
+
                                 if target_metric:
                                     st.divider()
                                     st.write(f"**Impact Assessment — целевой показатель: {target_metric}**")
