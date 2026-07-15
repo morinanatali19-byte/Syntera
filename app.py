@@ -750,7 +750,7 @@ elif page == "Evening Closure":
             """, (today, "Снимок дня сохранён", None, f"Направлений в снимке: {len(today_statuses)}"))
 
             st.success(f"Снимок за {today} сохранён")
-            # ==================== ЖУРНАЛ СОБЫТИЙ ====================
+# ==================== ЖУРНАЛ СОБЫТИЙ ====================
 elif page == "Журнал событий":
     st.subheader("Журнал событий")
 
@@ -769,7 +769,24 @@ elif page == "Журнал событий":
             "Impact Assessment": "badge-ok",
         }
 
-        for e_date, e_type, e_direction, e_description in all_events:
+        all_types = sorted(set(e[1] for e in all_events))
+        all_dirs = sorted(set(e[2] for e in all_events if e[2]))
+
+        col1, col2 = st.columns(2)
+        with col1:
+            filter_type = st.selectbox("Тип события", ["Все"] + all_types, key="event_filter_type")
+        with col2:
+            filter_dir = st.selectbox("Направление", ["Все"] + all_dirs, key="event_filter_dir")
+
+        filtered_events = [
+            e for e in all_events
+            if (filter_type == "Все" or e[1] == filter_type)
+            and (filter_dir == "Все" or e[2] == filter_dir)
+        ]
+
+        st.caption(f"Показано событий: {len(filtered_events)} из {len(all_events)}")
+
+        for e_date, e_type, e_direction, e_description in filtered_events:
             badge_class = type_badge_map.get(e_type, "badge-white")
             direction_text = f" &middot; {e_direction}" if e_direction else ""
             st.markdown(
