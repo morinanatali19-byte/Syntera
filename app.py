@@ -312,13 +312,13 @@ elif page == "Executive Briefing":
                     st.write("**Активные решения:**")
                     for name, weight in active:
                         cursor.execute(
-                            "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
+                            "SELECT id, decision_text, owner, deadline, target_metric FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
                             (name,))
                         d = cursor.fetchone()
                         status_label = "Нет выявленных отклонений"
                         badge_class = "badge-ok"
                         if d:
-                            decision_text, owner, deadline = d
+                            decision_id, decision_text, owner, deadline, target_metric = d
                             try:
                                 deadline_date = datetime.strptime(deadline, "%d.%m.%Y")
                                 if deadline_date < datetime.now():
@@ -336,6 +336,53 @@ elif page == "Executive Briefing":
                                 st.write(f"**Решение:** {decision_text}")
                                 st.write(f"**Владелец:** {owner}")
                                 st.write(f"**Срок:** {deadline}")
+
+                                if target_metric:
+                                    st.divider()
+                                    st.write(f"**Impact Assessment — целевой показатель: {target_metric}**")
+
+                                    cursor.execute(
+                                        "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id ASC",
+                                        (target_metric,))
+                                    metric_history = cursor.fetchall()
+
+                                    if metric_history:
+                                        col_a, col_b = st.columns(2)
+                                        with col_a:
+                                            st.caption(f"Первое значение ({metric_history[0][0]})")
+                                            st.write(metric_history[0][1])
+                                        with col_b:
+                                            st.caption(f"Последнее значение ({metric_history[-1][0]})")
+                                            st.write(metric_history[-1][1])
+                                    else:
+                                        st.caption("По этому показателю пока нет данных в Business Signals")
+
+                                    cursor.execute(
+                                        "SELECT confidence, note, assessed_date FROM decision_attributions WHERE decision_id = %s ORDER BY id DESC LIMIT 1",
+                                        (decision_id,))
+                                    existing_attribution = cursor.fetchone()
+
+                                    if existing_attribution:
+                                        st.caption(f"Последняя оценка ({existing_attribution[2]}): {existing_attribution[0]}")
+
+                                    attribution_confidence = st.selectbox(
+                                        "Насколько это решение повлияло на показатель?",
+                                        ["Не оценено", "Высокая уверенность", "Средняя уверенность", "Низкая уверенность", "Не связано"],
+                                        key=f"attr_{decision_id}")
+                                    attribution_note = st.text_input("Комментарий (необязательно)", key=f"attr_note_{decision_id}")
+
+                                    if st.button("Сохранить оценку связи", key=f"attr_btn_{decision_id}"):
+                                        if attribution_confidence != "Не оценено":
+                                            attr_today = datetime.now().strftime("%d.%m.%Y")
+                                            cursor.execute("""
+                                                INSERT INTO decision_attributions (decision_id, confidence, note, assessed_date)
+                                                VALUES (%s, %s, %s, %s)
+                                            """, (decision_id, attribution_confidence, attribution_note.strip(), attr_today))
+                                            st.success("Оценка сохранена")
+                                            st.rerun()
+                                        else:
+                                            st.error("Выберите уровень уверенности")
+
                                 cursor.execute(
                                 "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC",
                                 (name,))
