@@ -1,5 +1,6 @@
 import streamlit as st
 from db import get_connection
+from repositories.direction_repository import get_directions, add_direction, delete_direction
 
 st.set_page_config(
     page_title="Syntera",
@@ -185,8 +186,7 @@ if page == "Онбординг":
     st.divider()
     st.subheader("Стратегические направления")
 
-    cursor.execute("SELECT name, weight FROM directions")
-    all_directions = cursor.fetchall()
+    all_directions = get_directions(cursor)
     existing_names = [name for name, weight in all_directions]
 
     st.caption(f"Добавлено направлений: {len(all_directions)} из 5 максимум (минимум 3)")
@@ -204,17 +204,15 @@ if page == "Онбординг":
             elif new_direction.strip() in existing_names:
                 st.error(f"Направление '{new_direction}' уже добавлено")
             else:
-                cursor.execute("INSERT INTO directions (name, weight) VALUES (%s, %s)",
-                                (new_direction.strip(), new_weight))
+                if add_direction(cursor, new_direction.strip(), new_weight):
+                    from datetime import datetime
+                    event_today = datetime.now().strftime("%d.%m.%Y")
+                    cursor.execute("""
+                        INSERT INTO events (event_date, event_type, direction_name, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (event_today, "Направление добавлено", new_direction.strip(), f"Вес: {new_weight}"))
 
-                from datetime import datetime
-                event_today = datetime.now().strftime("%d.%m.%Y")
-                cursor.execute("""
-                    INSERT INTO events (event_date, event_type, direction_name, description)
-                    VALUES (%s, %s, %s, %s)
-                """, (event_today, "Направление добавлено", new_direction.strip(), f"Вес: {new_weight}"))
-
-                st.rerun()
+                    st.rerun()
     else:
         st.info("Достигнут максимум в 5 направлений. Удалите одно, чтобы добавить другое.")
 
@@ -229,16 +227,15 @@ if page == "Онбординг":
                     unsafe_allow_html=True)
             with col2:
                 if st.button("Удалить", key=f"del_{name}"):
-                    cursor.execute("DELETE FROM directions WHERE name = %s", (name,))
+                    if delete_direction(cursor, name):
+                        from datetime import datetime
+                        event_today = datetime.now().strftime("%d.%m.%Y")
+                        cursor.execute("""
+                            INSERT INTO events (event_date, event_type, direction_name, description)
+                            VALUES (%s, %s, %s, %s)
+                        """, (event_today, "Направление удалено", name, f"Вес был: {weight}"))
 
-                    from datetime import datetime
-                    event_today = datetime.now().strftime("%d.%m.%Y")
-                    cursor.execute("""
-                        INSERT INTO events (event_date, event_type, direction_name, description)
-                        VALUES (%s, %s, %s, %s)
-                    """, (event_today, "Направление удалено", name, f"Вес был: {weight}"))
-
-                    st.rerun()
+                        st.rerun()
 
     st.divider()
 
