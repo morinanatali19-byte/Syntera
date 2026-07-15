@@ -224,6 +224,14 @@ if page == "Онбординг":
             else:
                 cursor.execute("INSERT INTO directions (name, weight) VALUES (%s, %s)",
                                 (new_direction.strip(), new_weight))
+
+                from datetime import datetime
+                event_today = datetime.now().strftime("%d.%m.%Y")
+                cursor.execute("""
+                    INSERT INTO events (event_date, event_type, direction_name, description)
+                    VALUES (%s, %s, %s, %s)
+                """, (event_today, "Направление добавлено", new_direction.strip(), f"Вес: {new_weight}"))
+
                 st.rerun()
     else:
         st.info("Достигнут максимум в 5 направлений. Удалите одно, чтобы добавить другое.")
@@ -240,6 +248,14 @@ if page == "Онбординг":
             with col2:
                 if st.button("Удалить", key=f"del_{name}"):
                     cursor.execute("DELETE FROM directions WHERE name = %s", (name,))
+
+                    from datetime import datetime
+                    event_today = datetime.now().strftime("%d.%m.%Y")
+                    cursor.execute("""
+                        INSERT INTO events (event_date, event_type, direction_name, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (event_today, "Направление удалено", name, f"Вес был: {weight}"))
+
                     st.rerun()
 
     st.divider()
@@ -253,6 +269,14 @@ if page == "Онбординг":
             cursor.execute("DELETE FROM business_context WHERE id = 1")
             cursor.execute("INSERT INTO business_context (id, goal, horizon, criteria) VALUES (1, %s, %s, %s)",
                             (goal, horizon, criteria))
+
+            from datetime import datetime
+            event_today = datetime.now().strftime("%d.%m.%Y")
+            cursor.execute("""
+                INSERT INTO events (event_date, event_type, direction_name, description)
+                VALUES (%s, %s, %s, %s)
+            """, (event_today, "Стратегия сохранена", None, goal))
+
             st.success(f"Стратегия сохранена: {goal}. Направлений: {len(all_directions)}")
 
 # ==================== СТРАНИЦА BRIEFING ====================
@@ -368,6 +392,14 @@ elif page == "Executive Briefing":
                                     metric_to_save = None if new_target_metric == "Не выбрано" else new_target_metric
                                     cursor.execute("UPDATE decisions SET target_metric = %s WHERE id = %s",
                                                    (metric_to_save, decision_id))
+
+                                    event_today = datetime.now().strftime("%d.%m.%Y")
+                                    metric_description = metric_to_save if metric_to_save else "снят"
+                                    cursor.execute("""
+                                        INSERT INTO events (event_date, event_type, direction_name, description)
+                                        VALUES (%s, %s, %s, %s)
+                                    """, (event_today, "Целевой показатель изменён", name, f"Показатель: {metric_description}"))
+
                                     st.success("Целевой показатель обновлён")
                                     st.rerun()
 
