@@ -5,6 +5,10 @@ from repositories.decision_repository import (
     get_decided_direction_names, get_latest_decision, get_decision_history,
     create_decision, update_target_metric
 )
+from repositories.event_repository import create_event, get_events
+from repositories.business_signal_repository import (
+    add_signal, get_today_signals, get_metric_names, get_metric_history
+)
 
 st.set_page_config(
     page_title="Syntera",
@@ -207,11 +211,8 @@ if page == "Онбординг":
                 if add_direction(cursor, new_direction.strip(), new_weight):
                     from datetime import datetime
                     event_today = datetime.now().strftime("%d.%m.%Y")
-                    cursor.execute("""
-                        INSERT INTO events (event_date, event_type, direction_name, description)
-                        VALUES (%s, %s, %s, %s)
-                    """, (event_today, "Направление добавлено", new_direction.strip(), f"Вес: {new_weight}"))
-
+                    create_event(cursor, event_today, "Направление добавлено",
+                                 new_direction.strip(), f"Вес: {new_weight}")
                     st.rerun()
     else:
         st.info("Достигнут максимум в 5 направлений. Удалите одно, чтобы добавить другое.")
@@ -230,11 +231,8 @@ if page == "Онбординг":
                     if delete_direction(cursor, name):
                         from datetime import datetime
                         event_today = datetime.now().strftime("%d.%m.%Y")
-                        cursor.execute("""
-                            INSERT INTO events (event_date, event_type, direction_name, description)
-                            VALUES (%s, %s, %s, %s)
-                        """, (event_today, "Направление удалено", name, f"Вес был: {weight}"))
-
+                        create_event(cursor, event_today, "Направление удалено",
+                                     name, f"Вес был: {weight}")
                         st.rerun()
 
     st.divider()
@@ -251,10 +249,7 @@ if page == "Онбординг":
 
             from datetime import datetime
             event_today = datetime.now().strftime("%d.%m.%Y")
-            cursor.execute("""
-                INSERT INTO events (event_date, event_type, direction_name, description)
-                VALUES (%s, %s, %s, %s)
-            """, (event_today, "Стратегия сохранена", None, goal))
+            create_event(cursor, event_today, "Стратегия сохранена", None, goal)
 
             st.success(f"Стратегия сохранена: {goal}. Направлений: {len(all_directions)}")
 
@@ -350,8 +345,7 @@ elif page == "Executive Briefing":
                                 st.write(f"**Срок:** {deadline}")
 
                                 st.divider()
-                                cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
-                                available_metrics = [row[0] for row in cursor.fetchall()]
+                                available_metrics = get_metric_names(cursor)
                                 metric_options = ["Не выбрано"] + available_metrics
                                 current_index = metric_options.index(target_metric) if target_metric in metric_options else 0
                                 new_target_metric = st.selectbox(
@@ -362,11 +356,8 @@ elif page == "Executive Briefing":
                                     if update_target_metric(cursor, decision_id, metric_to_save):
                                         event_today = datetime.now().strftime("%d.%m.%Y")
                                         metric_description = metric_to_save if metric_to_save else "снят"
-                                        cursor.execute("""
-                                            INSERT INTO events (event_date, event_type, direction_name, description)
-                                            VALUES (%s, %s, %s, %s)
-                                        """, (event_today, "Целевой показатель изменён", name, f"Показатель: {metric_description}"))
-
+                                        create_event(cursor, event_today, "Целевой показатель изменён",
+                                                     name, f"Показатель: {metric_description}")
                                         st.success("Целевой показатель обновлён")
                                         st.rerun()
 
@@ -374,10 +365,7 @@ elif page == "Executive Briefing":
                                     st.divider()
                                     st.write(f"**Impact Assessment — целевой показатель: {target_metric}**")
 
-                                    cursor.execute(
-                                        "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id ASC",
-                                        (target_metric,))
-                                    metric_history = cursor.fetchall()
+                                    metric_history = get_metric_history(cursor, target_metric, limit=1000)
 
                                     if metric_history:
                                         col_a, col_b = st.columns(2)
@@ -412,11 +400,8 @@ elif page == "Executive Briefing":
                                                 VALUES (%s, %s, %s, %s)
                                             """, (decision_id, attribution_confidence, attribution_note.strip(), attr_today))
 
-                                            cursor.execute("""
-                                                INSERT INTO events (event_date, event_type, direction_name, description)
-                                                VALUES (%s, %s, %s, %s)
-                                            """, (attr_today, "Impact Assessment", name, f"{target_metric}: {attribution_confidence}"))
-
+                                            create_event(cursor, attr_today, "Impact Assessment",
+                                                         name, f"{target_metric}: {attribution_confidence}")
                                             st.success("Оценка сохранена")
                                             st.rerun()
                                         else:
@@ -448,11 +433,7 @@ elif page == "Executive Briefing":
                                         "INSERT INTO ceo_challenges (direction_name, reasoning, challenge_date) VALUES (%s, %s, %s)",
                                         (name, reasoning.strip(), today))
 
-                                    cursor.execute("""
-                                        INSERT INTO events (event_date, event_type, direction_name, description)
-                                        VALUES (%s, %s, %s, %s)
-                                    """, (today, "Возражение CEO", name, reasoning.strip()))
-
+                                    create_event(cursor, today, "Возражение CEO", name, reasoning.strip())
                                     st.success("Возражение зафиксировано. Статус останется прежним до пересмотра решения.")
                                     st.rerun()
                                 else:
@@ -474,11 +455,8 @@ elif page == "Executive Briefing":
                                     if create_decision(cursor, name, "Пересмотр решения", "", "",
                                                         new_decision_text.strip(), new_owner.strip(), new_deadline_str):
                                         event_today = datetime.now().strftime("%d.%m.%Y")
-                                        cursor.execute("""
-                                            INSERT INTO events (event_date, event_type, direction_name, description)
-                                            VALUES (%s, %s, %s, %s)
-                                        """, (event_today, "Решение пересмотрено", name, new_decision_text.strip()))
-
+                                        create_event(cursor, event_today, "Решение пересмотрено",
+                                                     name, new_decision_text.strip())
                                         st.success("Решение пересмотрено и обновлено.")
                                         st.rerun()
                                 else:
@@ -559,8 +537,7 @@ elif page == "Decision Board":
         deadline_date = st.date_input("Срок", key="db_deadline")
         deadline = deadline_date.strftime("%d.%m.%Y")
 
-        cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
-        existing_metrics = [row[0] for row in cursor.fetchall()]
+        existing_metrics = get_metric_names(cursor)
         target_metric = st.selectbox(
             "Какой показатель это решение должно улучшить? (необязательно)",
             ["Не выбрано"] + existing_metrics,
@@ -574,11 +551,7 @@ elif page == "Decision Board":
                 if create_decision(cursor, direction, conclusion, arguments, risks, decision_text, owner, deadline, metric_to_save):
                     from datetime import datetime
                     event_today = datetime.now().strftime("%d.%m.%Y")
-                    cursor.execute("""
-                        INSERT INTO events (event_date, event_type, direction_name, description)
-                        VALUES (%s, %s, %s, %s)
-                    """, (event_today, "Решение зафиксировано", direction, decision_text.strip()))
-
+                    create_event(cursor, event_today, "Решение зафиксировано", direction, decision_text.strip())
                     st.success(f"Решение по направлению '{direction}' зафиксировано.")
                     st.session_state.selected_direction = None
 
@@ -636,30 +609,23 @@ elif page == "Evening Closure":
 
         if st.button("Добавить показатель"):
             if metric_name.strip() and metric_value.strip():
-                cursor.execute(
-                    "INSERT INTO business_signals (signal_date, metric_name, value) VALUES (%s, %s, %s)",
-                    (today, metric_name.strip(), metric_value.strip()))
-                st.rerun()
+                if add_signal(cursor, today, metric_name.strip(), metric_value.strip()):
+                    st.rerun()
 
-        cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
-        today_signals = cursor.fetchall()
+        today_signals = get_today_signals(cursor, today)
         if today_signals:
             st.write("**Сегодня:**")
             for m_name, m_value in today_signals:
                 st.write(f"- {m_name}: **{m_value}**")
 
-        cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
-        all_metric_names = [row[0] for row in cursor.fetchall()]
+        all_metric_names = get_metric_names(cursor)
 
         if all_metric_names:
             st.write("**История по показателям:**")
             selected_metric = st.selectbox("Выберите показатель для просмотра истории",
                                              all_metric_names, key="metric_history_select")
 
-            cursor.execute(
-                "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id ASC LIMIT 30",
-                (selected_metric,))
-            history = cursor.fetchall()
+            history = get_metric_history(cursor, selected_metric, limit=30)
 
             if history:
                 import pandas as pd
@@ -741,18 +707,14 @@ elif page == "Evening Closure":
                         "INSERT INTO daily_snapshots (snapshot_date, direction_name, status) VALUES (%s, %s, %s)",
                         (today, name, status))
 
-            cursor.execute("""
-                INSERT INTO events (event_date, event_type, direction_name, description)
-                VALUES (%s, %s, %s, %s)
-            """, (today, "Снимок дня сохранён", None, f"Направлений в снимке: {len(today_statuses)}"))
+            create_event(cursor, today, "Снимок дня сохранён", None, f"Направлений в снимке: {len(today_statuses)}")
 
             st.success(f"Снимок за {today} сохранён")
 # ==================== ЖУРНАЛ СОБЫТИЙ ====================
 elif page == "Журнал событий":
     st.subheader("Журнал событий")
 
-    cursor.execute("SELECT event_date, event_type, direction_name, description FROM events ORDER BY id DESC LIMIT 100")
-    all_events = cursor.fetchall()
+    all_events = get_events(cursor, limit=100)
 
     if not all_events:
         st.info("Событий пока нет. Они будут появляться здесь по мере работы с приложением — "
