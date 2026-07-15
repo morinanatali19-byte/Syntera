@@ -6,6 +6,26 @@ st.set_page_config(
     page_icon="🧭",
     layout="wide"
 )
+st.markdown("""
+<style>
+.status-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+.badge-ok { background-color: #1F3D2B; color: #6FCF97; border: 1px solid #6FCF97; }
+.badge-overdue { background-color: #3D2620; color: #E0956B; border: 1px solid #E0956B; }
+.badge-white { background-color: #2A2D34; color: #9AA0A6; border: 1px solid #9AA0A6; }
+
+div[data-testid="stExpander"] {
+    border: 1px solid #2A2D34;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 conn = psycopg2.connect(st.secrets["DATABASE_URL"])
 conn.autocommit = True
@@ -105,11 +125,17 @@ if total_directions > 0:
     white_spot_count = total_directions - len(decided)
 
     st.sidebar.write("**Состояние сейчас:**")
-    st.sidebar.write(f"🟢 В порядке: {len(decided) - overdue_count}")
+    st.sidebar.markdown(
+        f'<span class="status-badge badge-ok">В порядке: {len(decided) - overdue_count}</span>',
+        unsafe_allow_html=True)
     if overdue_count > 0:
-        st.sidebar.write(f"🟠 Требуют внимания: {overdue_count}")
+        st.sidebar.markdown(
+            f'<span class="status-badge badge-overdue">Требуют внимания: {overdue_count}</span>',
+            unsafe_allow_html=True)
     if white_spot_count > 0:
-        st.sidebar.write(f"⚪ Без решения: {white_spot_count}")
+        st.sidebar.markdown(
+            f'<span class="status-badge badge-white">Без решения: {white_spot_count}</span>',
+            unsafe_allow_html=True)
 
 st.title("Syntera")
 
@@ -220,26 +246,23 @@ elif page == "Executive Briefing":
                             "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
                             (name,))
                         d = cursor.fetchone()
-                        status = "🟢 Нет выявленных отклонений"
-                        status_type = "success"
+                        status_label = "Нет выявленных отклонений"
+                        badge_class = "badge-ok"
                         if d:
                             decision_text, owner, deadline = d
                             try:
                                 deadline_date = datetime.strptime(deadline, "%d.%m.%Y")
                                 if deadline_date < datetime.now():
-                                    status = "🟠 Срок истёк"
-                                    status_type = "warning"
+                                    status_label = "Срок истёк"
+                                    badge_class = "badge-overdue"
                             except ValueError:
-                                status = "🟡 Не удалось распознать срок"
-                                status_type = "info"
+                                status_label = "Не удалось распознать срок"
+                                badge_class = "badge-white"
 
-                        with st.expander(f"{name} (вес: {weight}) — {status}"):
-                            if status_type == "warning":
-                                st.warning(f"Требует внимания: {status}")
-                            elif status_type == "info":
-                                st.info(status)
-                            else:
-                                st.success(status)
+                        with st.expander(f"{name} (вес: {weight}) — {status_label}"):
+                            st.markdown(
+                                f'<span class="status-badge {badge_class}">{status_label}</span>',
+                                unsafe_allow_html=True)
                             if d:
                                 st.write(f"**Решение:** {decision_text}")
                                 st.write(f"**Владелец:** {owner}")
@@ -405,20 +428,28 @@ elif page == "Evening Closure":
 
             if not d:
                 status = "white_spot"
-                st.write(f"- **{name}** (вес {weight}): решения нет — White Spot")
+                st.markdown(
+                    f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-white">White Spot</span>',
+                    unsafe_allow_html=True)
             else:
                 decision_text, owner, deadline = d
                 try:
                     deadline_date = datetime.strptime(deadline, "%d.%m.%Y")
                     if deadline_date < datetime.now():
                         status = "overdue"
-                        st.write(f"- **{name}** (вес {weight}): 🟠 срок истёк — требует пересмотра")
+                        st.markdown(
+                            f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-overdue">Требует пересмотра</span>',
+                            unsafe_allow_html=True)
                     else:
                         status = "ok"
-                        st.write(f"- **{name}** (вес {weight}): 🟢 в порядке, решение принято")
+                        st.markdown(
+                            f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-ok">В порядке</span>',
+                            unsafe_allow_html=True)
                 except ValueError:
                     status = "ok"
-                    st.write(f"- **{name}** (вес {weight}): решение принято, срок не распознан")
+                    st.markdown(
+                        f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-white">Срок не распознан</span>',
+                        unsafe_allow_html=True)
 
             today_statuses[name] = status
 
@@ -513,11 +544,17 @@ elif page == "Evening Closure":
                     if old == new:
                         continue
                     elif status_rank[new] > status_rank[old]:
-                        st.write(f"- 🟢 **{name}**: улучшение ({old} → {new})")
+                        st.markdown(
+                            f'<span class="status-badge badge-ok">Улучшение</span> &nbsp; **{name}**: {old} → {new}',
+                            unsafe_allow_html=True)
                     else:
-                        st.write(f"- 🔴 **{name}**: ухудшение ({old} → {new})")
+                        st.markdown(
+                            f'<span class="status-badge badge-overdue">Ухудшение</span> &nbsp; **{name}**: {old} → {new}',
+                            unsafe_allow_html=True)
                 else:
-                    st.write(f"- ⚪ **{name}**: новое направление")
+                    st.markdown(
+                        f'<span class="status-badge badge-white">Новое</span> &nbsp; **{name}**',
+                        unsafe_allow_html=True)
         else:
             st.caption("Это первый день наблюдения — сравнивать пока не с чем.")
 
