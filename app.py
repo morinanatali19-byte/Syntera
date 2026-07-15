@@ -268,6 +268,7 @@ elif page == "Executive Briefing":
                                 badge_class = "badge-white"
 
                         with st.expander(f"{name} (вес: {weight}) — {status_label}"):
+                            st.markdown(f'<div class="info-card">', unsafe_allow_html=True)
                             st.markdown(
                                 f'<span class="status-badge {badge_class}">{status_label}</span>',
                                 unsafe_allow_html=True)
@@ -330,6 +331,7 @@ elif page == "Executive Briefing":
                                     st.rerun()
                                 else:
                                     st.error("Заполните формулировку решения и владельца")
+                            st.markdown('</div>', unsafe_allow_html=True)
 
             if white_spots:
                 st.write("**Требуют внимания (нет решения):**")
