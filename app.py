@@ -92,23 +92,6 @@ CREATE TABLE IF NOT EXISTS business_signals (
 )
 """)
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS business_signals (
-    id SERIAL PRIMARY KEY,
-    signal_date TEXT,
-    metric_name TEXT,
-    value TEXT
-)
-""")
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS decision_attributions (
-    id SERIAL PRIMARY KEY,
-    decision_id INTEGER,
-    confidence TEXT,
-    note TEXT,
-    assessed_date TEXT
-)
-""")
-cursor.execute("""
 CREATE TABLE IF NOT EXISTS decision_attributions (
     id SERIAL PRIMARY KEY,
     decision_id INTEGER,
