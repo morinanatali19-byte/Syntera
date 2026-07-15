@@ -333,7 +333,8 @@ elif page == "Executive Briefing":
                         if st.button("Решить", key=f"decide_{name}"):
                             st.session_state.selected_direction = name
                             st.info("Направление выбрано. Перейдите во вкладку 'Decision Board' слева.")
-                            current_direction_names = [name for name, weight in directions]
+
+        current_direction_names = [name for name, weight in directions]
         cursor.execute("SELECT DISTINCT direction_name FROM decisions")
         all_decided_names = [row[0] for row in cursor.fetchall()]
         orphaned = [name for name in all_decided_names if name not in current_direction_names]
