@@ -310,6 +310,27 @@ elif page == "Executive Briefing":
                         if st.button("Решить", key=f"decide_{name}"):
                             st.session_state.selected_direction = name
                             st.info("Направление выбрано. Перейдите во вкладку 'Decision Board' слева.")
+                            current_direction_names = [name for name, weight in directions]
+        cursor.execute("SELECT DISTINCT direction_name FROM decisions")
+        all_decided_names = [row[0] for row in cursor.fetchall()]
+        orphaned = [name for name in all_decided_names if name not in current_direction_names]
+
+        if orphaned:
+            st.divider()
+            st.write("**⚠️ Решения, требующие пересмотра стратегии:**")
+            st.caption("Направление изменено или удалено, но решение по нему всё ещё существует.")
+            for o_name in orphaned:
+                cursor.execute(
+                    "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
+                    (o_name,))
+                o_decision = cursor.fetchone()
+                with st.expander(f"{o_name} — направление устарело"):
+                    if o_decision:
+                        st.write(f"**Решение:** {o_decision[0]}")
+                        st.write(f"**Владелец:** {o_decision[1]}")
+                        st.write(f"**Срок:** {o_decision[2]}")
+                    st.warning("Это направление больше не входит в текущую стратегию. "
+                               "Решение сохранено для истории, но не участвует в общей картине.")
 
 # ==================== DECISION BOARD ====================
 elif page == "Decision Board":
@@ -416,7 +437,8 @@ elif page == "Evening Closure":
                     "INSERT INTO business_signals (signal_date, metric_name, value) VALUES (%s, %s, %s)",
                     (today, metric_name.strip(), metric_value.strip()))
                 st.rerun()
-                cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
+
+        cursor.execute("SELECT metric_name, value FROM business_signals WHERE signal_date = %s", (today,))
         today_signals = cursor.fetchall()
         if today_signals:
             st.write("**Сегодня:**")
@@ -431,19 +453,19 @@ elif page == "Evening Closure":
             selected_metric = st.selectbox("Выберите показатель для просмотра истории",
                                              all_metric_names, key="metric_history_select")
 
-        cursor.execute(
+            cursor.execute(
                 "SELECT signal_date, value FROM business_signals WHERE metric_name = %s ORDER BY id ASC LIMIT 30",
                 (selected_metric,))
-        history = cursor.fetchall()
+            history = cursor.fetchall()
 
-        if history:
+            if history:
                 import pandas as pd
+                import re
 
                 numeric_values = []
                 valid_dates = []
                 has_non_numeric = False
 
-                import re
                 for h_date, h_value in history:
                     try:
                         cleaned = re.sub(r"[^\d.,\-]", "", h_value).replace(",", ".")
@@ -465,12 +487,6 @@ elif page == "Evening Closure":
                 st.write("**Подробно:**")
                 for h_date, h_value in reversed(history):
                     st.write(f"- {h_date}: **{h_value}**")
-
-        cursor.execute(
-            "SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
-        all_metric_names = [row[0] for row in cursor.fetchall()]
-
-        
 
         st.divider()
 
