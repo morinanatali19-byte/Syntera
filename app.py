@@ -440,34 +440,26 @@ elif page == "Evening Closure":
                 (name,))
             d = cursor.fetchone()
 
-            st.markdown('<div class="info-card">', unsafe_allow_html=True)
-
             if not d:
                 status = "white_spot"
-                st.markdown(
-                    f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-white">White Spot</span>',
-                    unsafe_allow_html=True)
+                badge_html = '<span class="status-badge badge-white">White Spot</span>'
             else:
                 decision_text, owner, deadline = d
                 try:
                     deadline_date = datetime.strptime(deadline, "%d.%m.%Y")
                     if deadline_date < datetime.now():
                         status = "overdue"
-                        st.markdown(
-                            f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-overdue">Требует пересмотра</span>',
-                            unsafe_allow_html=True)
+                        badge_html = '<span class="status-badge badge-overdue">Требует пересмотра</span>'
                     else:
                         status = "ok"
-                        st.markdown(
-                            f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-ok">В порядке</span>',
-                            unsafe_allow_html=True)
+                        badge_html = '<span class="status-badge badge-ok">В порядке</span>'
                 except ValueError:
                     status = "ok"
-                    st.markdown(
-                        f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-white">Срок не распознан</span>',
-                        unsafe_allow_html=True)
+                    badge_html = '<span class="status-badge badge-white">Срок не распознан</span>'
 
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="info-card"><b>{name}</b> (вес {weight}) &nbsp; {badge_html}</div>',
+                unsafe_allow_html=True)
             today_statuses[name] = status
 
         st.divider()
