@@ -1,5 +1,5 @@
 import streamlit as st
-from db import get_connection
+import psycopg2
 
 st.set_page_config(
     page_title="Syntera",
@@ -35,7 +35,8 @@ div[data-testid="stExpander"] {
 </style>
 """, unsafe_allow_html=True)
 
-conn = get_connection()
+conn = psycopg2.connect(st.secrets["DATABASE_URL"])
+conn.autocommit = True
 cursor = conn.cursor()
 
 cursor.execute("""
