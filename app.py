@@ -271,8 +271,7 @@ elif page == "Executive Briefing":
         st.write(f"**Главная цель:** {context[0]}")
 
         # ---- Фокус дня (CEO Focus) ----
-        cursor.execute("SELECT name, weight FROM directions")
-        focus_directions = cursor.fetchall()
+        focus_directions = get_directions(cursor)
         cursor.execute("SELECT direction_name FROM decisions")
         focus_decided = [row[0] for row in cursor.fetchall()]
 
@@ -310,8 +309,7 @@ elif page == "Executive Briefing":
 
         st.divider()
 
-        cursor.execute("SELECT name, weight FROM directions")
-        directions = cursor.fetchall()
+        directions = get_directions(cursor)
 
         cursor.execute("SELECT direction_name FROM decisions")
         decided_directions = [row[0] for row in cursor.fetchall()]
@@ -612,8 +610,7 @@ elif page == "Decision Board":
 elif page == "Evening Closure":
     st.subheader("Evening Closure")
 
-    cursor.execute("SELECT name, weight FROM directions")
-    directions = cursor.fetchall()
+    directions = get_directions(cursor)
 
     if not directions:
         st.info("Стратегические направления ещё не заданы")
