@@ -470,14 +470,22 @@ elif page == "Decision Board":
         deadline_date = st.date_input("Срок", key="db_deadline")
         deadline = deadline_date.strftime("%d.%m.%Y")
 
+        cursor.execute("SELECT DISTINCT metric_name FROM business_signals ORDER BY metric_name")
+        existing_metrics = [row[0] for row in cursor.fetchall()]
+        target_metric = st.selectbox(
+            "Какой показатель это решение должно улучшить? (необязательно)",
+            ["Не выбрано"] + existing_metrics,
+            key="db_target_metric")
+
         if st.button("Зафиксировать решение"):
             if not conclusion.strip() or not decision_text.strip() or not owner.strip():
                 st.error("Заполните вывод, формулировку решения и владельца")
             else:
+                metric_to_save = None if target_metric == "Не выбрано" else target_metric
                 cursor.execute("""
-                    INSERT INTO decisions (direction_name, conclusion, arguments, risks, decision_text, owner, deadline)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (direction, conclusion, arguments, risks, decision_text, owner, deadline))
+                    INSERT INTO decisions (direction_name, conclusion, arguments, risks, decision_text, owner, deadline, target_metric)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (direction, conclusion, arguments, risks, decision_text, owner, deadline, metric_to_save))
                 st.success(f"Решение по направлению '{direction}' зафиксировано.")
                 st.session_state.selected_direction = None
 
