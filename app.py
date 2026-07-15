@@ -1,6 +1,10 @@
 import streamlit as st
 from db import get_connection
 from repositories.direction_repository import get_directions, add_direction, delete_direction
+from repositories.decision_repository import (
+    get_decided_direction_names, get_latest_decision, get_decision_history,
+    create_decision, update_target_metric
+)
 
 st.set_page_config(
     page_title="Syntera",
@@ -133,19 +137,15 @@ cursor.execute("SELECT COUNT(*) FROM directions")
 total_directions = cursor.fetchone()[0]
 
 if total_directions > 0:
-    cursor.execute("SELECT DISTINCT direction_name FROM decisions")
-    decided = [row[0] for row in cursor.fetchall()]
+    decided = get_decided_direction_names(cursor)
 
     overdue_count = 0
     from datetime import datetime
     for name in decided:
-        cursor.execute(
-            "SELECT deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
-            (name,))
-        deadline_row = cursor.fetchone()
-        if deadline_row:
+        d_side = get_latest_decision(cursor, name)
+        if d_side:
             try:
-                if datetime.strptime(deadline_row[0], "%d.%m.%Y") < datetime.now():
+                if datetime.strptime(d_side[3], "%d.%m.%Y") < datetime.now():
                     overdue_count += 1
             except ValueError:
                 pass
@@ -270,23 +270,19 @@ elif page == "Executive Briefing":
     else:
         st.write(f"**Главная цель:** {context[0]}")
 
-        # ---- Фокус дня (CEO Focus) ----
+       # ---- Фокус дня (CEO Focus) ----
         focus_directions = get_directions(cursor)
-        cursor.execute("SELECT direction_name FROM decisions")
-        focus_decided = [row[0] for row in cursor.fetchall()]
+        focus_decided = get_decided_direction_names(cursor)
 
         focus_candidates = []
         for f_name, f_weight in focus_directions:
             if f_name not in focus_decided:
                 focus_candidates.append((f_name, f_weight, "white_spot"))
             else:
-                cursor.execute(
-                    "SELECT deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
-                    (f_name,))
-                f_deadline_row = cursor.fetchone()
-                if f_deadline_row:
+                f_decision = get_latest_decision(cursor, f_name)
+                if f_decision:
                     try:
-                        if datetime.strptime(f_deadline_row[0], "%d.%m.%Y") < datetime.now():
+                        if datetime.strptime(f_decision[3], "%d.%m.%Y") < datetime.now():
                             focus_candidates.append((f_name, f_weight, "overdue"))
                     except ValueError:
                         pass
@@ -311,8 +307,7 @@ elif page == "Executive Briefing":
 
         directions = get_directions(cursor)
 
-        cursor.execute("SELECT direction_name FROM decisions")
-        decided_directions = [row[0] for row in cursor.fetchall()]
+        decided_directions = get_decided_direction_names(cursor)
 
         white_spots = [(name, weight) for name, weight in directions if name not in decided_directions]
         active = [(name, weight) for name, weight in directions if name in decided_directions]
@@ -331,10 +326,7 @@ elif page == "Executive Briefing":
                 if active:
                     st.write("**Активные решения:**")
                     for name, weight in active:
-                        cursor.execute(
-                            "SELECT id, decision_text, owner, deadline, target_metric FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
-                            (name,))
-                        d = cursor.fetchone()
+                        d = get_latest_decision(cursor, name)
                         status_label = "Нет выявленных отклонений"
                         badge_class = "badge-ok"
                         if d:
@@ -367,18 +359,16 @@ elif page == "Executive Briefing":
                                     metric_options, index=current_index, key=f"target_metric_edit_{decision_id}")
                                 if st.button("Обновить целевой показатель", key=f"update_metric_btn_{decision_id}"):
                                     metric_to_save = None if new_target_metric == "Не выбрано" else new_target_metric
-                                    cursor.execute("UPDATE decisions SET target_metric = %s WHERE id = %s",
-                                                   (metric_to_save, decision_id))
+                                    if update_target_metric(cursor, decision_id, metric_to_save):
+                                        event_today = datetime.now().strftime("%d.%m.%Y")
+                                        metric_description = metric_to_save if metric_to_save else "снят"
+                                        cursor.execute("""
+                                            INSERT INTO events (event_date, event_type, direction_name, description)
+                                            VALUES (%s, %s, %s, %s)
+                                        """, (event_today, "Целевой показатель изменён", name, f"Показатель: {metric_description}"))
 
-                                    event_today = datetime.now().strftime("%d.%m.%Y")
-                                    metric_description = metric_to_save if metric_to_save else "снят"
-                                    cursor.execute("""
-                                        INSERT INTO events (event_date, event_type, direction_name, description)
-                                        VALUES (%s, %s, %s, %s)
-                                    """, (event_today, "Целевой показатель изменён", name, f"Показатель: {metric_description}"))
-
-                                    st.success("Целевой показатель обновлён")
-                                    st.rerun()
+                                        st.success("Целевой показатель обновлён")
+                                        st.rerun()
 
                                 if target_metric:
                                     st.divider()
@@ -432,10 +422,7 @@ elif page == "Executive Briefing":
                                         else:
                                             st.error("Выберите уровень уверенности")
 
-                                cursor.execute(
-                                "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC",
-                                (name,))
-                            all_versions = cursor.fetchall()                       
+                                all_versions = get_decision_history(cursor, name)
                             if len(all_versions) > 1:
                                 with st.expander(f"История решений по направлению ({len(all_versions)} версий)"):
                                     for i, (v_text, v_owner, v_deadline) in enumerate(all_versions):
@@ -484,20 +471,16 @@ elif page == "Executive Briefing":
                             if st.button("Сохранить пересмотренное решение", key=f"review_btn_{name}"):
                                 if new_decision_text.strip() and new_owner.strip():
                                     new_deadline_str = new_deadline.strftime("%d.%m.%Y")
-                                    cursor.execute("""
-                                        INSERT INTO decisions (direction_name, conclusion, arguments, risks, decision_text, owner, deadline)
-                                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                    """, (name, "Пересмотр решения", "", "", new_decision_text.strip(),
-                                          new_owner.strip(), new_deadline_str))
+                                    if create_decision(cursor, name, "Пересмотр решения", "", "",
+                                                        new_decision_text.strip(), new_owner.strip(), new_deadline_str):
+                                        event_today = datetime.now().strftime("%d.%m.%Y")
+                                        cursor.execute("""
+                                            INSERT INTO events (event_date, event_type, direction_name, description)
+                                            VALUES (%s, %s, %s, %s)
+                                        """, (event_today, "Решение пересмотрено", name, new_decision_text.strip()))
 
-                                    event_today = datetime.now().strftime("%d.%m.%Y")
-                                    cursor.execute("""
-                                        INSERT INTO events (event_date, event_type, direction_name, description)
-                                        VALUES (%s, %s, %s, %s)
-                                    """, (event_today, "Решение пересмотрено", name, new_decision_text.strip()))
-
-                                    st.success("Решение пересмотрено и обновлено.")
-                                    st.rerun()
+                                        st.success("Решение пересмотрено и обновлено.")
+                                        st.rerun()
                                 else:
                                     st.error("Заполните формулировку решения и владельца")
 
@@ -518,8 +501,7 @@ elif page == "Executive Briefing":
                             st.info("Направление выбрано. Перейдите во вкладку 'Decision Board' слева.")
 
         current_direction_names = [name for name, weight in directions]
-        cursor.execute("SELECT DISTINCT direction_name FROM decisions")
-        all_decided_names = [row[0] for row in cursor.fetchall()]
+        all_decided_names = get_decided_direction_names(cursor)
         orphaned = [name for name in all_decided_names if name not in current_direction_names]
 
         if orphaned:
@@ -527,10 +509,8 @@ elif page == "Executive Briefing":
             st.write("**⚠️ Решения, требующие пересмотра стратегии:**")
             st.caption("Направление изменено или удалено, но решение по нему всё ещё существует.")
             for o_name in orphaned:
-                cursor.execute(
-                    "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
-                    (o_name,))
-                o_decision = cursor.fetchone()
+                o_full = get_latest_decision(cursor, o_name)
+                o_decision = (o_full[1], o_full[2], o_full[3]) if o_full else None
                 with st.expander(f"{o_name} — направление устарело"):
                     if o_decision:
                         st.write(f"**Решение:** {o_decision[0]}")
@@ -591,20 +571,16 @@ elif page == "Decision Board":
                 st.error("Заполните вывод, формулировку решения и владельца")
             else:
                 metric_to_save = None if target_metric == "Не выбрано" else target_metric
-                cursor.execute("""
-                    INSERT INTO decisions (direction_name, conclusion, arguments, risks, decision_text, owner, deadline, target_metric)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (direction, conclusion, arguments, risks, decision_text, owner, deadline, metric_to_save))
+                if create_decision(cursor, direction, conclusion, arguments, risks, decision_text, owner, deadline, metric_to_save):
+                    from datetime import datetime
+                    event_today = datetime.now().strftime("%d.%m.%Y")
+                    cursor.execute("""
+                        INSERT INTO events (event_date, event_type, direction_name, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (event_today, "Решение зафиксировано", direction, decision_text.strip()))
 
-                from datetime import datetime
-                event_today = datetime.now().strftime("%d.%m.%Y")
-                cursor.execute("""
-                    INSERT INTO events (event_date, event_type, direction_name, description)
-                    VALUES (%s, %s, %s, %s)
-                """, (event_today, "Решение зафиксировано", direction, decision_text.strip()))
-
-                st.success(f"Решение по направлению '{direction}' зафиксировано.")
-                st.session_state.selected_direction = None
+                    st.success(f"Решение по направлению '{direction}' зафиксировано.")
+                    st.session_state.selected_direction = None
 
 # ==================== EVENING CLOSURE ====================
 elif page == "Evening Closure":
@@ -624,10 +600,8 @@ elif page == "Evening Closure":
         today_statuses = {}
 
         for name, weight in directions:
-            cursor.execute(
-                "SELECT decision_text, owner, deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
-                (name,))
-            d = cursor.fetchone()
+            d_full = get_latest_decision(cursor, name)
+            d = (d_full[1], d_full[2], d_full[3]) if d_full else None
 
             if not d:
                 status = "white_spot"
