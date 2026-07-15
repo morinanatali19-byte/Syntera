@@ -336,7 +336,8 @@ elif page == "Executive Briefing":
             if white_spots:
                 st.write("**Требуют внимания (нет решения):**")
                 for name, weight in sorted(white_spots, key=lambda d: -d[1]):
-                    st.markdown(f'<div class="info-card">', unsafe_allow_html=True)
+                    st.markdown(f'<div class="info-card">', 
+                    unsafe_allow_html=True)
                     col1, col2 = st.columns([4, 1])
                     with col1:
                         st.write(f"**{name}** &nbsp; <span class='status-badge badge-white'>вес {weight}</span>", unsafe_allow_html=True)
@@ -439,6 +440,8 @@ elif page == "Evening Closure":
                 (name,))
             d = cursor.fetchone()
 
+            st.markdown('<div class="info-card">', unsafe_allow_html=True)
+
             if not d:
                 status = "white_spot"
                 st.markdown(
@@ -464,6 +467,7 @@ elif page == "Evening Closure":
                         f'**{name}** (вес {weight}) &nbsp; <span class="status-badge badge-white">Срок не распознан</span>',
                         unsafe_allow_html=True)
 
+            st.markdown('</div>', unsafe_allow_html=True)
             today_statuses[name] = status
 
         st.divider()
