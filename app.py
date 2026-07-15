@@ -225,6 +225,45 @@ elif page == "Executive Briefing":
         st.warning("Сначала заполните стратегию во вкладке 'Онбординг'")
     else:
         st.write(f"**Главная цель:** {context[0]}")
+
+        # ---- Фокус дня (CEO Focus) ----
+        cursor.execute("SELECT name, weight FROM directions")
+        focus_directions = cursor.fetchall()
+        cursor.execute("SELECT direction_name FROM decisions")
+        focus_decided = [row[0] for row in cursor.fetchall()]
+
+        focus_candidates = []
+        for f_name, f_weight in focus_directions:
+            if f_name not in focus_decided:
+                focus_candidates.append((f_name, f_weight, "white_spot"))
+            else:
+                cursor.execute(
+                    "SELECT deadline FROM decisions WHERE direction_name = %s ORDER BY id DESC LIMIT 1",
+                    (f_name,))
+                f_deadline_row = cursor.fetchone()
+                if f_deadline_row:
+                    try:
+                        if datetime.strptime(f_deadline_row[0], "%d.%m.%Y") < datetime.now():
+                            focus_candidates.append((f_name, f_weight, "overdue"))
+                    except ValueError:
+                        pass
+
+        if focus_candidates:
+            def focus_score(item):
+                _, w, kind = item
+                return w + (10 if kind == "overdue" else 0)
+
+            focus_candidates.sort(key=focus_score, reverse=True)
+            top_name, top_weight, top_kind = focus_candidates[0]
+            top_reason = "просрочен срок решения" if top_kind == "overdue" else "нет решения (White Spot)"
+
+            st.markdown(
+                f'<div class="info-card">'
+                f'<span class="status-badge badge-overdue">Фокус дня</span> &nbsp; '
+                f'<b>{top_name}</b> (вес {top_weight}) — {top_reason}'
+                f'</div>',
+                unsafe_allow_html=True)
+
         st.divider()
 
         cursor.execute("SELECT name, weight FROM directions")
