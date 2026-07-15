@@ -163,6 +163,7 @@ if page == "Онбординг":
                             index=["1 год", "3 года", "5 лет"].index(default_horizon))
     criteria = st.text_area("Критерий достижения", value=default_criteria)
 
+    st.divider()
     st.subheader("Стратегические направления")
 
     cursor.execute("SELECT name, weight FROM directions")
@@ -195,7 +196,10 @@ if page == "Онбординг":
         for name, weight in all_directions:
             col1, col2 = st.columns([4, 1])
             with col1:
-                st.write(f"- {name} (вес: {weight})")
+                st.markdown(
+                    f'<div class="info-card"><b>{name}</b> &nbsp; '
+                    f'<span class="status-badge badge-white">вес {weight}</span></div>',
+                    unsafe_allow_html=True)
             with col2:
                 if st.button("Удалить", key=f"del_{name}"):
                     cursor.execute("DELETE FROM directions WHERE name = %s", (name,))
